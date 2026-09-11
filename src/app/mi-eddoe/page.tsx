@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { Card, Badge } from "@/components/ui/Card";
+import { SignOutButton } from "@/components/layout/SignOutButton";
 
 /**
  * Dashboard del participante. Fase 1: estructura y ruta listas; el
@@ -20,6 +21,9 @@ export default async function MiEddoePage() {
           <div>
             <p className="font-serif text-lg font-bold text-gold">EDDOE</p>
             <h1 className="mt-1 text-2xl font-bold">Bienvenido(a), {session.user.email}</h1>
+          </div>
+          <div className="ml-auto">
+            <SignOutButton />
           </div>
         </div>
       </header>

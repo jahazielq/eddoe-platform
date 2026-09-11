@@ -22,6 +22,13 @@ export default async function MiEddoePage() {
     where: { userId: session.user.id },
   });
 
+  const feedbackReports = assessmentSession
+    ? await prisma.feedbackReport.findMany({
+        where: { sessionId: assessmentSession.id, publishedAt: { not: null } },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b-4 border-gold bg-navy py-6 text-white">
@@ -69,9 +76,22 @@ export default async function MiEddoePage() {
 
         <Card>
           <h2 className="font-semibold text-navy">Historial y resultados</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Todavía no tienes evaluaciones completadas.
-          </p>
+          {feedbackReports.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-600">Todavía no tienes evaluaciones completadas.</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {feedbackReports.map((report) => (
+                <li key={report.id} className="flex items-center justify-between rounded-md border border-slate-200 p-3">
+                  <span className="text-sm text-slate-700">
+                    Resultado del {report.publishedAt?.toLocaleDateString("es-MX")}
+                  </span>
+                  <Link href={`/mi-eddoe/resultados/${report.sessionId}`} className="text-sm font-semibold text-navy-light underline">
+                    Ver resultado
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </main>
     </div>

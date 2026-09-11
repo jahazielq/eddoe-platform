@@ -64,12 +64,16 @@ export default function SolicitudDetallePage() {
         <dl className="space-y-2 text-sm">
           {data.formSchema.fields
             .filter((f) => f.type !== "checkbox")
-            .map((f) => (
-              <div key={f.key} className="flex justify-between border-b border-slate-100 py-1">
-                <dt className="text-slate-500">{f.label}</dt>
-                <dd className="font-medium text-slate-800">{String(data.answers?.[f.key] ?? "—")}</dd>
-              </div>
-            ))}
+            .map((f) => {
+              const v = data.answers?.[f.key];
+              const display = Array.isArray(v) ? (v.length ? v.join(", ") : "—") : String(v ?? "—");
+              return (
+                <div key={f.key} className="flex justify-between gap-4 border-b border-slate-100 py-1">
+                  <dt className="text-slate-500">{f.label}</dt>
+                  <dd className="text-right font-medium text-slate-800">{display}</dd>
+                </div>
+              );
+            })}
         </dl>
       </Card>
 

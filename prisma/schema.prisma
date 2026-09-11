@@ -108,15 +108,10 @@ model ParticipantProfile {
   firstName          String
   lastNamePaterno    String
   lastNameMaterno    String?
-  employeeNumber     String?
-  profession         String?
-  academicDegree     String?
-  department         String?
-  program            String?
-  subjectsTaught     String?
-  campus             String?
-  yearsOfExperience  Int?
-  teachingActivity   String?
+  /// Respuestas completas del formulario de registro (RegistrationFormSchema.fields),
+  /// tal como se capturaron. El formulario es dinamico, asi que el detalle
+  /// academico/institucional vive aqui en vez de columnas fijas.
+  answers            Json?
   cohortId           String?
   cohort             Cohort?  @relation(fields: [cohortId], references: [id])
   createdAt          DateTime @default(now())
@@ -159,14 +154,12 @@ enum SchemaStatus {
 model RegistrationRequest {
   id               String   @id @default(uuid())
   email            String
-  status           RegistrationStatus @default(DRAFT)
+  status           RegistrationStatus @default(SUBMITTED)
   formSchemaId     String
   formSchema       RegistrationFormSchema @relation(fields: [formSchemaId], references: [id])
   answers          Json?    // respuestas capturadas según RegistrationFormSchema.fields
   privacyAccepted  Boolean  @default(false)
   termsAccepted    Boolean  @default(false)
-  verificationToken String? @unique
-  verifiedAt       DateTime?
   reviewedById     String?
   reviewNote       String?
   submittedAt      DateTime?

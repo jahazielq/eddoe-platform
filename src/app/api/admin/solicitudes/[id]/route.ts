@@ -73,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data: {
         email: request.email,
         passwordHash,
-        emailVerified: request.verifiedAt ?? new Date(),
+        emailVerified: new Date(),
         status: "PENDING_PASSWORD",
       },
     });
@@ -87,15 +87,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         firstName: answers.firstName ?? "",
         lastNamePaterno: answers.lastNamePaterno ?? "",
         lastNameMaterno: answers.lastNameMaterno ?? null,
-        employeeNumber: answers.employeeNumber ?? null,
-        profession: answers.profession ?? null,
-        academicDegree: answers.academicDegree ?? null,
-        department: answers.department ?? null,
-        program: answers.program ?? null,
-        subjectsTaught: answers.subjectsTaught ?? null,
-        campus: answers.campus ?? null,
-        yearsOfExperience: answers.yearsOfExperience ? Number(answers.yearsOfExperience) : null,
-        teachingActivity: answers.teachingActivity ?? null,
+        answers: answers as any,
       },
     });
 

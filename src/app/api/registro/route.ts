@@ -1,27 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { sendEmail, verificationEmailHtml } from "@/lib/email";
+import { sendEmail } from "@/lib/email";
 import { logAuditEvent } from "@/lib/audit";
+import type { RegistrationField } from "@/lib/registration/formSchema";
 
 const bodySchema = z.object({
-  email: z.string().email(),
+  answers: z.record(z.unknown()),
 });
 
 /**
- * Paso 1 del registro: crea una RegistrationRequest en DRAFT y envía un
- * correo de verificación. No se pide más información aquí (regla: evitar
- * recolectar datos que no sean necesarios en cada paso).
+ * Envía la solicitud de inscripción completa en un solo paso (sin
+ * verificación de correo previa): valida obligatoriedad en servidor contra
+ * el `RegistrationFormSchema` publicado y crea la `RegistrationRequest` ya
+ * como `SUBMITTED`, lista para revisión administrativa.
  */
 export async function POST(req: NextRequest) {
   const json = await req.json().catch(() => null);
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Correo inválido." }, { status: 400 });
+    return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
-
-  const email = parsed.data.email.toLowerCase().trim();
 
   const activeSchema = await prisma.registrationFormSchema.findFirst({
     where: { status: "PUBLISHED" },
@@ -34,6 +33,29 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const answers = parsed.data.answers;
+  const fields = activeSchema.fields as unknown as RegistrationField[];
+
+  const missing = fields
+    .filter((f) => f.visible && f.required)
+    .filter((f) => {
+      const v = answers[f.key];
+      if (Array.isArray(v)) return v.length === 0;
+      return v === undefined || v === null || v === "" || v === false;
+    });
+
+  if (missing.length > 0) {
+    return NextResponse.json(
+      { error: "Faltan campos obligatorios.", fields: missing.map((f) => f.key) },
+      { status: 400 }
+    );
+  }
+
+  const email = String(answers.correoAcceso ?? "").toLowerCase().trim();
+  if (!email) {
+    return NextResponse.json({ error: "Falta el correo de acceso." }, { status: 400 });
+  }
+
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
     return NextResponse.json(
@@ -42,26 +64,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const verificationToken = randomUUID();
-
   const request = await prisma.registrationRequest.create({
     data: {
       email,
       formSchemaId: activeSchema.id,
-      verificationToken,
-      status: "DRAFT",
+      answers: answers as any,
+      privacyAccepted: Boolean(answers.privacyAccepted),
+      termsAccepted: Boolean(answers.termsAccepted),
+      status: "SUBMITTED",
+      submittedAt: new Date(),
     },
   });
 
-  const verifyUrl = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/registro/perfil?token=${verificationToken}`;
   await sendEmail({
     to: email,
-    subject: "Verifica tu correo — EDDOE",
-    html: verificationEmailHtml(verifyUrl),
+    subject: "Recibimos tu solicitud — EDDOE",
+    html: `<p>Recibimos tu solicitud de inscripción a la EDDOE. Un administrador la revisará en breve.</p><p>Tu folio de seguimiento es: <strong>${request.id}</strong></p>`,
   });
 
   await logAuditEvent({
-    action: "registration.created",
+    action: "registration.submitted",
     entityType: "RegistrationRequest",
     entityId: request.id,
   });

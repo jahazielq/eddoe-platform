@@ -86,15 +86,7 @@ CREATE TABLE "participant_profiles" (
     "firstName" TEXT NOT NULL,
     "lastNamePaterno" TEXT NOT NULL,
     "lastNameMaterno" TEXT,
-    "employeeNumber" TEXT,
-    "profession" TEXT,
-    "academicDegree" TEXT,
-    "department" TEXT,
-    "program" TEXT,
-    "subjectsTaught" TEXT,
-    "campus" TEXT,
-    "yearsOfExperience" INTEGER,
-    "teachingActivity" TEXT,
+    "answers" JSONB,
     "cohortId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -127,13 +119,11 @@ CREATE TABLE "registration_form_schemas" (
 CREATE TABLE "registration_requests" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "status" "RegistrationStatus" NOT NULL DEFAULT 'DRAFT',
+    "status" "RegistrationStatus" NOT NULL DEFAULT 'SUBMITTED',
     "formSchemaId" TEXT NOT NULL,
     "answers" JSONB,
     "privacyAccepted" BOOLEAN NOT NULL DEFAULT false,
     "termsAccepted" BOOLEAN NOT NULL DEFAULT false,
-    "verificationToken" TEXT,
-    "verifiedAt" TIMESTAMP(3),
     "reviewedById" TEXT,
     "reviewNote" TEXT,
     "submittedAt" TIMESTAMP(3),
@@ -482,9 +472,6 @@ CREATE UNIQUE INDEX "password_reset_tokens_token_key" ON "password_reset_tokens"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "participant_profiles_userId_key" ON "participant_profiles"("userId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "registration_requests_verificationToken_key" ON "registration_requests"("verificationToken");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "registration_requests_createdUserId_key" ON "registration_requests"("createdUserId");

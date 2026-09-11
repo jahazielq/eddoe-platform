@@ -15,9 +15,12 @@ export default async function MiEddoePage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b-4 border-gold bg-navy py-6 text-white">
-        <div className="mx-auto max-w-4xl px-6">
-          <p className="font-serif text-lg font-bold text-gold">EDDOE</p>
-          <h1 className="mt-1 text-2xl font-bold">Bienvenido(a), {session.user.email}</h1>
+        <div className="mx-auto flex max-w-4xl items-center gap-3 px-6">
+          <img src="/logo-eddoe.png" alt="Logotipo EDDOE" className="h-12 w-12" />
+          <div>
+            <p className="font-serif text-lg font-bold text-gold">EDDOE</p>
+            <h1 className="mt-1 text-2xl font-bold">Bienvenido(a), {session.user.email}</h1>
+          </div>
         </div>
       </header>
 

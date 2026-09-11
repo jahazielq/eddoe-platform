@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
@@ -5,8 +6,9 @@ export function PublicHeader() {
   return (
     <header className="border-b-4 border-gold bg-navy text-white">
       <div className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-4">
-        <Link href="/" className="font-serif text-lg font-bold tracking-wide text-gold">
-          EDDOE
+        <Link href="/" className="flex items-center gap-2">
+          <Image src="/logo-eddoe.png" alt="Logotipo EDDOE" width={40} height={40} className="h-10 w-10" priority />
+          <span className="font-serif text-lg font-bold tracking-wide text-gold">EDDOE</span>
         </Link>
         <span className="hidden text-sm text-white/80 sm:inline">
           Facultad de Medicina, UNAM

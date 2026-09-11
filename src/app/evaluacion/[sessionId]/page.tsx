@@ -67,26 +67,6 @@ export default async function EvaluacionPage({ params }: { params: { sessionId: 
           <p className="mt-2 text-sm text-slate-700">{bienvenida as string}</p>
         </Card>
 
-        {embedUrl && (
-          <Card>
-            <h2 className="font-semibold text-navy">Video</h2>
-            <div className="mt-3 aspect-video w-full overflow-hidden rounded-md">
-              <iframe
-                src={embedUrl}
-                title="Video introductorio EDDOE"
-                className="h-full w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          </Card>
-        )}
-
-        <Card>
-          <h2 className="font-semibold text-navy">Instrucciones</h2>
-          <p className="mt-2 text-sm text-slate-700">{instrucciones as string}</p>
-        </Card>
-
         <section>
           <h2 className="mb-6 text-center font-serif text-lg font-bold text-navy">Circuito de estaciones</h2>
           <StationRing
@@ -97,6 +77,31 @@ export default async function EvaluacionPage({ params }: { params: { sessionId: 
             }))}
           />
         </section>
+
+        <Card>
+          <h2 className="font-semibold text-navy">Instrucciones</h2>
+          <p className="mt-2 text-sm text-slate-700">{instrucciones as string}</p>
+        </Card>
+
+        {embedUrl && (
+          <details className="group rounded-lg border border-slate-200 bg-white shadow-sm">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-4 font-semibold text-navy">
+              Video introductorio
+              <span className="text-sm text-navy-light transition group-open:rotate-180">▾</span>
+            </summary>
+            <div className="px-6 pb-6">
+              <div className="aspect-video w-full overflow-hidden rounded-md">
+                <iframe
+                  src={embedUrl}
+                  title="Video introductorio EDDOE"
+                  className="h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          </details>
+        )}
 
         <Card>
           <h2 className="font-semibold text-navy">Créditos</h2>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -10,10 +10,12 @@ import { Card, Alert } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Field";
 
+const ADMIN_ROLES = ["SUPER_ADMIN", "ACADEMIC_ADMIN", "STATION_EDITOR", "EVALUATOR", "SUPPORT"];
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/mi-eddoe";
+  const explicitCallbackUrl = searchParams.get("callbackUrl");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,12 +31,22 @@ function LoginForm() {
       password,
       redirect: false,
     });
-    setLoading(false);
     if (result?.error) {
+      setLoading(false);
       setError("Correo o contraseña incorrectos.");
       return;
     }
-    router.push(callbackUrl);
+
+    // Si no se pidió una ruta específica (p.ej. al entrar directo a /login),
+    // enviamos a cada quien a su propio destino según su rol.
+    if (explicitCallbackUrl) {
+      router.push(explicitCallbackUrl);
+      return;
+    }
+    const session = await getSession();
+    const roles = (session?.user?.roles as string[] | undefined) ?? [];
+    const isAdmin = roles.some((r) => ADMIN_ROLES.includes(r));
+    router.push(isAdmin ? "/admin" : "/mi-eddoe");
   }
 
   return (

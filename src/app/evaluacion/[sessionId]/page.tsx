@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { getPublicContent } from "@/lib/publicContent";
 import { youtubeEmbedUrl } from "@/lib/youtube";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { StationRing } from "@/components/evaluacion/StationRing";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +53,11 @@ export default async function EvaluacionPage({ params }: { params: { sessionId: 
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-6">
           <img src="/logo-eddoe.png" alt="Logotipo EDDOE" className="h-12 w-12" />
           <h1 className="font-serif text-xl font-bold">Evaluación del Desempeño Docente Objetiva Estructurada</h1>
+          <Link href="/mi-eddoe" className="ml-auto">
+            <Button variant="ghost" className="!border-white/60 !text-white hover:!bg-white/10">
+              ← Volver al inicio
+            </Button>
+          </Link>
         </div>
       </header>
 
@@ -81,21 +88,14 @@ export default async function EvaluacionPage({ params }: { params: { sessionId: 
         </Card>
 
         <section>
-          <h2 className="mb-4 text-center font-serif text-lg font-bold text-navy">Circuito de estaciones</h2>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            {assessmentSession.blueprint.stations.map((st) => (
-              <Link
-                key={st.id}
-                href={`/evaluacion/${assessmentSession.id}/estacion/${st.order}`}
-                className="flex h-24 w-24 flex-col items-center justify-center rounded-full border-4 border-gold bg-navy text-center text-white shadow transition hover:bg-navy-light"
-              >
-                <span className="text-xs uppercase tracking-wide text-gold">
-                  {st.isDemo ? "Demo" : "Estación"}
-                </span>
-                <span className="text-xl font-bold">{st.isDemo ? "" : st.order}</span>
-              </Link>
-            ))}
-          </div>
+          <h2 className="mb-6 text-center font-serif text-lg font-bold text-navy">Circuito de estaciones</h2>
+          <StationRing
+            stations={assessmentSession.blueprint.stations.map((st) => ({
+              order: st.order,
+              isDemo: st.isDemo,
+              href: `/evaluacion/${assessmentSession.id}/estacion/${st.order}`,
+            }))}
+          />
         </section>
 
         <Card>

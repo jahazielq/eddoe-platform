@@ -54,6 +54,11 @@ export default async function EstacionPage({ params }: Props) {
           <img src="/logo-eddoe.png" alt="Logotipo EDDOE" className="h-10 w-10" />
           <h1 className="font-serif text-lg font-bold">{label}</h1>
           <span className="ml-auto text-sm text-white/80">{minutes} min</span>
+          <Link href="/mi-eddoe">
+            <Button variant="ghost" className="!border-white/60 !text-white hover:!bg-white/10">
+              ← Volver al inicio
+            </Button>
+          </Link>
         </div>
       </header>
 

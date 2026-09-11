@@ -15,6 +15,10 @@ export async function GET() {
       createdAt: true,
       roles: { select: { role: { select: { code: true, name: true } } } },
       participantProfile: { select: { firstName: true, lastNamePaterno: true } },
+      assessmentSessions: {
+        select: { id: true, status: true },
+        take: 1,
+      },
     },
   });
 

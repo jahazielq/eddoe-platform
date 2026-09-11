@@ -17,6 +17,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
     "rubric.editPublished",
     "evidence.view",
     "audit.view",
+    "assessment.activate",
   ],
   ACADEMIC_ADMIN: [
     "registration.review",
@@ -26,6 +27,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
     "station.publish",
     "evidence.view",
     "audit.view",
+    "assessment.activate",
   ],
   STATION_EDITOR: ["station.editDraft"],
   EVALUATOR: ["evidence.view.assigned"],

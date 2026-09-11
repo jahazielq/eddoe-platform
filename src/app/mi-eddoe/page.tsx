@@ -1,8 +1,13 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { Card, Badge } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "@/components/layout/SignOutButton";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Dashboard del participante. Fase 1: estructura y ruta listas; el
@@ -12,6 +17,10 @@ import { SignOutButton } from "@/components/layout/SignOutButton";
 export default async function MiEddoePage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login?callbackUrl=/mi-eddoe");
+
+  const assessmentSession = await prisma.assessmentSession.findFirst({
+    where: { userId: session.user.id },
+  });
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -38,10 +47,24 @@ export default async function MiEddoePage() {
 
         <Card>
           <h2 className="font-semibold text-navy">Próxima evaluación</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Aún no hay una convocatoria asignada a tu perfil. Cuando exista, aparecerá aquí junto con la
-            fecha, los requisitos y el botón para iniciar la EDDOE.
-          </p>
+          {assessmentSession ? (
+            <>
+              <p className="mt-2 text-sm text-slate-600">
+                Tu evaluación EDDOE está lista. Podrás recorrer la estación demo y las seis estaciones del
+                circuito.
+              </p>
+              <div className="mt-4">
+                <Link href={`/evaluacion/${assessmentSession.id}`}>
+                  <Button variant="primary">Iniciar EDDOE</Button>
+                </Link>
+              </div>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-slate-600">
+              Aún no tienes una evaluación activada. Cuando el administrador la active, aparecerá aquí
+              junto con el botón para iniciar la EDDOE.
+            </p>
+          )}
         </Card>
 
         <Card>

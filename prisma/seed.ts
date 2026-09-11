@@ -44,6 +44,22 @@ const PUBLIC_CONTENT: Array<{ key: string; type: string; value: unknown }> = [
       { question: "¿Cuántos intentos tengo?", answer: "Un intento por ciclo, en una sesión única y continua." },
     ],
   },
+  { key: "evaluacion.videoUrl", type: "text", value: "https://www.youtube.com/watch?v=8IDETpXd8xY" },
+  {
+    key: "evaluacion.bienvenida",
+    type: "richText",
+    value: "Bienvenido(a) a tu Evaluación del Desempeño Docente Objetiva Estructurada. Antes de comenzar, revisa el video y las instrucciones generales.",
+  },
+  {
+    key: "evaluacion.instrucciones",
+    type: "richText",
+    value: "Recorrerás una estación demo de práctica y seis estaciones. Cada una tiene un tiempo asignado; una vez iniciada una estación no podrás pausarla.",
+  },
+  {
+    key: "evaluacion.creditos",
+    type: "richText",
+    value: "EDDOE — Secretaría de Educación Médica, Facultad de Medicina, UNAM.",
+  },
 ];
 
 async function main() {
@@ -113,7 +129,7 @@ async function main() {
     create: { key: "registrationApprovalMode", value: "MANUAL" as any },
   });
 
-  // Catálogo de competencias y estaciones (sin versiones publicadas todavía — Fase 2)
+  // Catálogo de competencias y estaciones
   for (const s of STATIONS) {
     await prisma.competency.upsert({
       where: { code: s.competencyCode },
@@ -125,6 +141,66 @@ async function main() {
       update: { name: s.name },
       create: { code: s.code, name: s.name },
     });
+  }
+
+  // Estación Demo (práctica, no evaluada)
+  await prisma.station.upsert({
+    where: { code: "DEMO" },
+    update: {},
+    create: { code: "DEMO", name: "Estación demo" },
+  });
+
+  // Versión inicial (placeholder) de cada estación, para que el admin tenga
+  // algo que editar desde /admin/estaciones y para poder armar el blueprint.
+  const allStationCodes = ["DEMO", ...STATIONS.map((s) => s.code)];
+  const stationVersionByCode: Record<string, string> = {};
+  for (const code of allStationCodes) {
+    const station = await prisma.station.findUniqueOrThrow({ where: { code } });
+    let version = await prisma.stationVersion.findFirst({
+      where: { stationId: station.id },
+      orderBy: { versionNumber: "desc" },
+    });
+    if (!version) {
+      version = await prisma.stationVersion.create({
+        data: {
+          stationId: station.id,
+          versionNumber: 1,
+          status: "PUBLISHED",
+          durationSeconds: code === "DEMO" ? 180 : 720,
+          objective: "Contenido pendiente de captura por el equipo académico.",
+          publishedAt: new Date(),
+        },
+      });
+    }
+    stationVersionByCode[code] = version.id;
+  }
+
+  // Convocatoria y circuito (blueprint) inicial: demo + 6 estaciones en orden.
+  let assessment = await prisma.assessment.findFirst({ where: { name: "EDDOE 2026" } });
+  if (!assessment) {
+    assessment = await prisma.assessment.create({ data: { name: "EDDOE 2026" } });
+  }
+  let blueprint = await prisma.assessmentBlueprint.findFirst({ where: { assessmentId: assessment.id } });
+  if (!blueprint) {
+    blueprint = await prisma.assessmentBlueprint.create({
+      data: {
+        assessmentId: assessment.id,
+        versionNumber: 1,
+        generalInstructions: "Circuito de estación demo más seis estaciones.",
+      },
+    });
+    let order = 0;
+    for (const code of allStationCodes) {
+      await prisma.assessmentStation.create({
+        data: {
+          assessmentBlueprintId: blueprint.id,
+          stationVersionId: stationVersionByCode[code]!,
+          order,
+          isDemo: code === "DEMO",
+        },
+      });
+      order += 1;
+    }
   }
 
   console.log("Seed completo. Admin:", adminEmail, "(contraseña temporal en este script — cámbiala).");

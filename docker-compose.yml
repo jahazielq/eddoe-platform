@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: eddoe
+      POSTGRES_PASSWORD: eddoe
+      POSTGRES_DB: eddoe
+    ports:
+      - "5432:5432"
+    volumes:
+      - eddoe_pgdata:/var/lib/postgresql/data
+
+volumes:
+  eddoe_pgdata:

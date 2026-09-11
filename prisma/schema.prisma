@@ -1,0 +1,613 @@
+// EDDOE — Esquema de datos (Fase 1 + estructura preparada para fases posteriores)
+// Todos los identificadores técnicos son UUID. Ninguna entidad usa el número
+// de estación (E1..E6) como llave primaria: ese valor vive en Station.code.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Identidad y RBAC ─────────────────────────
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String?
+  emailVerified DateTime?
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  roles              UserRole[]
+  participantProfile ParticipantProfile?
+  registrationRequest RegistrationRequest? @relation("RequestUser")
+  assessmentSessions  AssessmentSession[]
+  auditEvents         AuditEvent[]
+  notifications       Notification[]
+  createdStationVersions StationVersion[] @relation("StationVersionCreatedBy")
+
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_PASSWORD
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  code        RoleCode @unique
+  name        String
+  description String?
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+enum RoleCode {
+  SUPER_ADMIN
+  ACADEMIC_ADMIN
+  STATION_EDITOR
+  EVALUATOR
+  SUPPORT
+  PARTICIPANT
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  code        String @unique // ej. "registration.approve"
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+model ParticipantProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName          String
+  lastNamePaterno    String
+  lastNameMaterno    String?
+  employeeNumber     String?
+  profession         String?
+  academicDegree     String?
+  department         String?
+  program            String?
+  subjectsTaught     String?
+  campus             String?
+  yearsOfExperience  Int?
+  teachingActivity   String?
+  cohortId           String?
+  cohort             Cohort?  @relation(fields: [cohortId], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("participant_profiles")
+}
+
+model Cohort {
+  id          String   @id @default(uuid())
+  name        String   // ej. "EDDOE 2026 - Primer año"
+  createdAt   DateTime @default(now())
+
+  participants ParticipantProfile[]
+
+  @@map("cohorts")
+}
+
+// ───────────────────────── Inscripción ─────────────────────────
+
+model RegistrationFormSchema {
+  id          String   @id @default(uuid())
+  versionNumber Int
+  status      SchemaStatus @default(DRAFT)
+  fields      Json     // Field[] — ver src/lib/registration/formSchema.ts
+  createdAt   DateTime @default(now())
+  publishedAt DateTime?
+
+  requests RegistrationRequest[]
+
+  @@map("registration_form_schemas")
+}
+
+enum SchemaStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model RegistrationRequest {
+  id               String   @id @default(uuid())
+  email            String
+  status           RegistrationStatus @default(DRAFT)
+  formSchemaId     String
+  formSchema       RegistrationFormSchema @relation(fields: [formSchemaId], references: [id])
+  answers          Json?    // respuestas capturadas según RegistrationFormSchema.fields
+  privacyAccepted  Boolean  @default(false)
+  termsAccepted    Boolean  @default(false)
+  verificationToken String? @unique
+  verifiedAt       DateTime?
+  reviewedById     String?
+  reviewNote       String?
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  createdUserId    String?  @unique
+  createdUser      User?    @relation("RequestUser", fields: [createdUserId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("registration_requests")
+}
+
+enum RegistrationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  NEEDS_CHANGES
+  ACCOUNT_CREATED
+}
+
+// ───────────────────────── Competencias ─────────────────────────
+
+model Competency {
+  id          String   @id @default(uuid())
+  code        String   @unique // ej. "FACILITA_APRENDIZAJE"
+  name        String
+  description String?
+  type        String?
+  active      Boolean  @default(true)
+
+  stationVersions StationVersionCompetency[]
+
+  @@map("competencies")
+}
+
+model LearningOutcome {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  description String
+
+  stationVersions StationVersionLearningOutcome[]
+
+  @@map("learning_outcomes")
+}
+
+// ───────────────────────── Estaciones (versionadas) ─────────────────────────
+
+model Station {
+  id   String @id @default(uuid())
+  code String @unique // "E1".."E6" — solo una etiqueta legible, no PK funcional
+  name String
+
+  versions StationVersion[]
+
+  @@map("stations")
+}
+
+model StationVersion {
+  id              String   @id @default(uuid())
+  stationId       String
+  station         Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  versionNumber   Int
+  status          VersionStatus @default(DRAFT)
+  durationSeconds Int
+  objective       String?
+  scenario        String?
+  instructions    String?
+  materials       Json?
+  rubricVersionId String?
+  rubricVersion   RubricVersion? @relation(fields: [rubricVersionId], references: [id])
+  aiConfigId      String?
+  aiConfig        AIConfig? @relation(fields: [aiConfigId], references: [id])
+  featureFlags    Json?    // { audioRecording: true, aiEvaluation: true, ... }
+  createdById     String?
+  createdBy       User?    @relation("StationVersionCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+  publishedAt     DateTime?
+
+  blocks       StationBlock[]
+  assets       StationAsset[]
+  competencies StationVersionCompetency[]
+  outcomes     StationVersionLearningOutcome[]
+  attempts     StationAttempt[]
+  assessmentStations AssessmentStation[]
+
+  @@unique([stationId, versionNumber])
+  @@map("station_versions")
+}
+
+enum VersionStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+model StationVersionCompetency {
+  stationVersionId String
+  competencyId     String
+  stationVersion   StationVersion @relation(fields: [stationVersionId], references: [id], onDelete: Cascade)
+  competency       Competency     @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@id([stationVersionId, competencyId])
+  @@map("station_version_competencies")
+}
+
+model StationVersionLearningOutcome {
+  stationVersionId  String
+  learningOutcomeId String
+  stationVersion    StationVersion  @relation(fields: [stationVersionId], references: [id], onDelete: Cascade)
+  learningOutcome   LearningOutcome @relation(fields: [learningOutcomeId], references: [id], onDelete: Cascade)
+
+  @@id([stationVersionId, learningOutcomeId])
+  @@map("station_version_learning_outcomes")
+}
+
+model StationBlock {
+  id               String   @id @default(uuid())
+  stationVersionId String
+  stationVersion   StationVersion @relation(fields: [stationVersionId], references: [id], onDelete: Cascade)
+  order            Int
+  type             String   // "instructions" | "scenario" | "textResponse" | "audioRecorder" | ...
+  config           Json     // configuración específica del bloque
+  responseSchema   Json?    // { kind: "text" | "audio" | "video" | "selection" | ..., required, ... }
+
+  responses Response[]
+
+  @@unique([stationVersionId, order])
+  @@map("station_blocks")
+}
+
+model StationAsset {
+  id               String   @id @default(uuid())
+  stationVersionId String
+  stationVersion   StationVersion @relation(fields: [stationVersionId], references: [id], onDelete: Cascade)
+  kind             String   // "image" | "video" | "pdf" | "document"
+  storageLocation  String
+  label            String?
+  createdAt        DateTime @default(now())
+
+  @@map("station_assets")
+}
+
+// ───────────────────────── Rúbricas ─────────────────────────
+
+model Rubric {
+  id   String @id @default(uuid())
+  name String
+
+  versions RubricVersion[]
+
+  @@map("rubrics")
+}
+
+model RubricVersion {
+  id            String   @id @default(uuid())
+  rubricId      String
+  rubric        Rubric   @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  status        VersionStatus @default(DRAFT)
+  createdAt     DateTime @default(now())
+  publishedAt   DateTime?
+
+  criteria        RubricCriterion[]
+  stationVersions StationVersion[]
+  aiEvaluations   AIEvaluation[]
+
+  @@unique([rubricId, versionNumber])
+  @@map("rubric_versions")
+}
+
+model RubricCriterion {
+  id              String   @id @default(uuid())
+  rubricVersionId String
+  rubricVersion   RubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
+  order           Int
+  name            String
+  description     String?
+
+  levels RubricLevel[]
+  scores Score[]
+
+  @@map("rubric_criteria")
+}
+
+model RubricLevel {
+  id          String   @id @default(uuid())
+  criterionId String
+  criterion   RubricCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  order       Int      // 0 = No logrado .. N = Avanzado
+  label       String   // "No logrado" | "En desarrollo" | "Competente" | "Avanzado" | ...
+  points      Float
+  descriptor  String
+
+  scores Score[]
+
+  @@map("rubric_levels")
+}
+
+// ───────────────────────── Evaluación (Assessment) ─────────────────────────
+
+model Assessment {
+  id        String   @id @default(uuid())
+  name      String   // ej. "EDDOE 2026"
+  createdAt DateTime @default(now())
+
+  blueprints AssessmentBlueprint[]
+  sessions   AssessmentSession[]
+
+  @@map("assessments")
+}
+
+model AssessmentBlueprint {
+  id                String   @id @default(uuid())
+  assessmentId      String
+  assessment        Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  versionNumber     Int
+  opensAt           DateTime?
+  closesAt          DateTime?
+  allowPause        Boolean  @default(false)
+  reentryPolicy     String?  // reglas de reingreso
+  generalInstructions String?
+  completionCriteria String?
+  feedbackConfig    Json?
+  createdAt         DateTime @default(now())
+
+  stations AssessmentStation[]
+  sessions AssessmentSession[]
+
+  @@unique([assessmentId, versionNumber])
+  @@map("assessment_blueprints")
+}
+
+model AssessmentStation {
+  id                    String   @id @default(uuid())
+  assessmentBlueprintId String
+  blueprint             AssessmentBlueprint @relation(fields: [assessmentBlueprintId], references: [id], onDelete: Cascade)
+  stationVersionId      String
+  stationVersion        StationVersion @relation(fields: [stationVersionId], references: [id])
+  order                 Int
+  isDemo                Boolean  @default(false)
+
+  @@unique([assessmentBlueprintId, order])
+  @@map("assessment_stations")
+}
+
+model AssessmentSession {
+  id                    String   @id @default(uuid())
+  assessmentId          String
+  assessment            Assessment @relation(fields: [assessmentId], references: [id])
+  assessmentBlueprintId String
+  blueprint             AssessmentBlueprint @relation(fields: [assessmentBlueprintId], references: [id])
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id])
+  status                SessionStatus @default(NOT_STARTED)
+  startedAt             DateTime?
+  completedAt           DateTime?
+  isTestAttempt         Boolean  @default(false)
+
+  attempts StationAttempt[]
+
+  @@map("assessment_sessions")
+}
+
+enum SessionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  PROCESSING
+  EVALUATED
+  ERROR
+  INVALIDATED
+}
+
+model StationAttempt {
+  id                 String   @id @default(uuid())
+  sessionId          String
+  session            AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  stationVersionId   String
+  stationVersion     StationVersion @relation(fields: [stationVersionId], references: [id])
+  status             SessionStatus @default(NOT_STARTED)
+  startedAt          DateTime?
+  expiresAt          DateTime?      // calculado en servidor al iniciar el intento
+  submittedAt        DateTime?
+  timeoutBehavior    String   @default("AUTO_SUBMIT") // AUTO_SUBMIT | LOCK | ALLOW_GRACE_PERIOD
+  isTestAttempt      Boolean  @default(false)
+
+  responses  Response[]
+  evidences  Evidence[]
+  aiEvaluation AIEvaluation?
+  auditEvents  AuditEvent[]
+
+  @@map("station_attempts")
+}
+
+model Response {
+  id               String   @id @default(uuid())
+  stationAttemptId String
+  stationAttempt   StationAttempt @relation(fields: [stationAttemptId], references: [id], onDelete: Cascade)
+  stationBlockId   String
+  stationBlock     StationBlock @relation(fields: [stationBlockId], references: [id])
+  value            Json     // texto, selección, referencia a evidencia, etc.
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  evidences Evidence[]
+
+  @@unique([stationAttemptId, stationBlockId])
+  @@map("responses")
+}
+
+model Evidence {
+  id               String   @id @default(uuid())
+  stationAttemptId String
+  stationAttempt   StationAttempt @relation(fields: [stationAttemptId], references: [id], onDelete: Cascade)
+  responseId       String?
+  response         Response? @relation(fields: [responseId], references: [id])
+  evidenceType     EvidenceType
+  storageLocation  String   // p.ej. assessment/{id}/session/{id}/station/{id}/attempt/{id}/archivo
+  status           String   @default("STORED")
+  createdAt        DateTime @default(now())
+
+  @@map("evidences")
+}
+
+enum EvidenceType {
+  TEXT
+  AUDIO
+  VIDEO
+  SELECTION
+  CHECKLIST
+  FILE
+  INTERACTION_LOG
+}
+
+// ───────────────────────── IA y calificación ─────────────────────────
+
+model AIConfig {
+  id              String   @id @default(uuid())
+  provider        String   // "gemini" | "openai" | "manual"
+  model           String?
+  promptVersion   String
+  temperature     Float?
+  responseSchema  Json     // JSON Schema esperado de salida
+  createdAt       DateTime @default(now())
+
+  stationVersions StationVersion[]
+  evaluations     AIEvaluation[]
+
+  @@map("ai_configs")
+}
+
+model AIEvaluation {
+  id                String   @id @default(uuid())
+  stationAttemptId  String   @unique
+  stationAttempt    StationAttempt @relation(fields: [stationAttemptId], references: [id], onDelete: Cascade)
+  aiConfigId        String
+  aiConfig          AIConfig @relation(fields: [aiConfigId], references: [id])
+  rubricVersionId   String
+  rubricVersion     RubricVersion @relation(fields: [rubricVersionId], references: [id])
+  rawOutput         Json     // salida estructurada validada contra el schema del AIConfig
+  reviewedByHuman   Boolean  @default(false)
+  reviewedById      String?
+  createdAt         DateTime @default(now())
+
+  scores Score[]
+
+  @@map("ai_evaluations")
+}
+
+model Score {
+  id             String   @id @default(uuid())
+  aiEvaluationId String
+  aiEvaluation   AIEvaluation @relation(fields: [aiEvaluationId], references: [id], onDelete: Cascade)
+  criterionId    String
+  criterion      RubricCriterion @relation(fields: [criterionId], references: [id])
+  levelId        String
+  level          RubricLevel @relation(fields: [levelId], references: [id])
+  justification  String?
+
+  @@map("scores")
+}
+
+model FeedbackReport {
+  id           String   @id @default(uuid())
+  sessionId    String   @unique
+  rawDataRef   String?  // referencia a RawEvaluationData (agregado, no expuesto directo)
+  publishedAt  DateTime?
+  content      Json?    // reporte final publicado al participante
+  createdAt    DateTime @default(now())
+
+  @@map("feedback_reports")
+}
+
+// ───────────────────────── Plataforma ─────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  channel   String   // "email" | "in_app"
+  template  String
+  payload   Json?
+  sentAt    DateTime?
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model AuditEvent {
+  id               String   @id @default(uuid())
+  actorUserId      String?
+  actor            User?    @relation(fields: [actorUserId], references: [id])
+  action           String   // "login" | "registration.approved" | "station.published" | ...
+  entityType       String?
+  entityId         String?
+  stationAttemptId String?
+  stationAttempt   StationAttempt? @relation(fields: [stationAttemptId], references: [id])
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  @@map("audit_events")
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+model PublicContent {
+  id        String   @id @default(uuid())
+  key       String   @unique // "landing.hero.title", "faq.item.1", ...
+  type      String   @default("text") // "text" | "richText" | "faqItem" | "document"
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("public_contents")
+}
